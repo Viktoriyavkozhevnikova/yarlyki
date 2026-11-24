@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Своя игра: Ярлыки</title>
+<style>
+/* Макет: один игровой экран — табло слева/сверху, счёт команд снизу; модальное окно вопроса. Единый тёмно-ягодный мир игры. */
+:root{
+  --bg:#4a1f31;          /* фон зала */
+  --board:#5a2439;       /* поле табло */
+  --berry:#6d2e46;       /* карточки тем */
+  --cream:#f4ede4;       /* клетки-номиналы, светлый текст */
+  --rose:#a26769;        /* кнопки, акцент */
+  --gold:#c9a227;        /* спецэлементы, финал */
+  --green:#84b59f;       /* верный ответ */
+  --red:#c46a6a;         /* неверный ответ */
+  --ink:#2b2024;         /* тёмный текст на светлом */
+  --muted:#cbb2a6;       /* второстепенный текст */
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{
+  margin:0;background:var(--bg);color:var(--cream);
+  font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:12px;
+}
+h1,h2,.serif{font-family:Cambria,'Times New Roman',Georgia,serif}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:14px;min-height:96vh}
+header.top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-size:clamp(22px,3.2vw,34px);margin:0;color:var(--cream);letter-spacing:.5px}
+h1 small{color:var(--muted);font-size:.55em;letter-spacing:2px;font-family:inherit}
+button{font:inherit;cursor:pointer;border:none;border-radius:10px}
+button:focus-visible,[tabindex]:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.btn{background:var(--rose);color:#fff;font-weight:700;padding:.55em 1.1em;font-size:15px}
+.btn.gold{background:var(--gold);color:var(--ink)}
+.btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--rose)}
+.btn:disabled{opacity:.45;cursor:default}
+
+/* ---- настройка ---- */
+#setup .panel{background:var(--board);border-radius:16px;padding:22px;max-width:640px;margin:4vh auto;display:flex;flex-direction:column;gap:16px}
+#setup h2{margin:0;font-size:22px}
+#setup p{margin:0;color:var(--muted);line-height:1.45}
+.teamrow{display:flex;gap:10px;align-items:center}
+.teamrow input{flex:1;min-width:0;background:#44202f;border:1px solid var(--rose);border-radius:8px;color:var(--cream);padding:.5em .7em;font:inherit}
+.count{display:flex;gap:8px}
+.count button{width:42px;height:42px;border-radius:50%;background:var(--berry);color:var(--cream);font-weight:700;border:1px solid var(--rose)}
+.count button[aria-pressed="true"]{background:var(--gold);color:var(--ink);border-color:var(--gold)}
+
+/* ---- табло ---- */
+#boardview{display:none;flex-direction:column;gap:14px;flex:1}
+.board{display:grid;grid-template-columns:minmax(150px,1.6fr) repeat(5,1fr);gap:8px}
+.theme{background:var(--berry);border:1px solid var(--rose);border-radius:10px;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:700;font-size:clamp(11px,1.4vw,15px);padding:6px;min-height:58px}
+.cell{background:var(--cream);color:var(--berry);font-weight:800;font-size:clamp(16px,2vw,24px);border:1px solid var(--rose);border-radius:10px;min-height:58px;font-variant-numeric:tabular-nums}
+.cell:not(:disabled):hover{background:#fff}
+.cell:disabled{background:#56293c;color:#7c4458;border-color:#6a3449}
+.boardfoot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.hint{color:var(--muted);font-size:13px;font-style:italic}
+
+/* ---- счёт ---- */
+.scores{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.team{background:var(--board);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;border:1px solid #6a3449}
+.team .name{font-weight:700;font-size:14px;overflow-wrap:anywhere}
+.team .pts{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums}
+.team .pts.neg{color:#f0b9b9}
+.adjust{display:flex;gap:6px}
+.adjust button{background:#44202f;color:var(--muted);border:1px solid #6a3449;border-radius:7px;padding:2px 9px;font-size:12px}
+.team.lead{border-color:var(--gold)}
+
+/* ---- модальное окно ---- */
+.overlay{position:fixed;inset:0;background:rgba(26,10,17,.82);display:none;align-items:center;justify-content:center;z-index:30;
+  padding:max(16px,env(safe-area-inset-left,0px));padding-top:max(16px,env(safe-area-inset-top,0px));padding-bottom:max(16px,env(safe-area-inset-bottom,0px))}
+.overlay.open{display:flex}
+.modal{background:var(--berry);border-radius:18px;max-width:880px;width:100%;max-height:92vh;overflow-y:auto;padding:26px;display:flex;flex-direction:column;gap:18px;border:1px solid var(--rose)}
+.modal .meta{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.modal .meta .where{color:#e8c9b8;font-weight:700;letter-spacing:1px;font-size:15px}
+.badge{background:var(--gold);color:var(--ink);font-weight:800;padding:.35em .8em;border-radius:9px;font-size:15px}
+.qtext{font-size:clamp(19px,2.6vw,27px);line-height:1.35;text-align:center;margin:10px 0}
+.answer{display:none;flex-direction:column;gap:10px;background:#5a2439;border-radius:12px;padding:16px;text-align:center}
+.answer.show{display:flex}
+.answer .a{font-size:clamp(22px,3vw,32px);font-weight:800;color:var(--gold)}
+.answer .note{color:var(--cream);font-style:italic;font-size:15px;line-height:1.45}
+.verdict{display:none;flex-direction:column;gap:10px}
+.verdict.show{display:flex}
+.verdict .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.verdict .row .lbl{min-width:120px;font-weight:700;font-size:14px;overflow-wrap:anywhere}
+.vbtn{padding:.4em .9em;font-weight:700;color:#fff;border-radius:8px;font-size:14px}
+.vbtn.ok{background:var(--green);color:var(--ink)}
+.vbtn.no{background:var(--red)}
+.vbtn.used{opacity:.4;pointer-events:none}
+.modal .foot{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+
+/* ---- финал ---- */
+.betgrid{display:flex;flex-direction:column;gap:8px}
+.betgrid .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.betgrid input{width:110px;background:#44202f;border:1px solid var(--rose);border-radius:8px;color:var(--cream);padding:.4em .6em;font:inherit;font-variant-numeric:tabular-nums}
+.betgrid .max{color:var(--muted);font-size:12px}
+.confirmbar{display:none;gap:10px;align-items:center;background:#5a2439;border:1px solid var(--gold);border-radius:10px;padding:10px 14px;flex-wrap:wrap}
+.confirmbar.show{display:flex}
+@media (max-width:620px){
+  .board{grid-template-columns:minmax(110px,1.3fr) repeat(5,1fr);gap:5px}
+  .theme,.cell{min-height:46px}
+  .modal{padding:18px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>СВОЯ ИГРА: ЯРЛЫКИ <small>ПО МАТЕРИАЛАМ МАСТЕР-КЛАССА «ВЛОЖИТЬ ДУШУ НЕЛЬЗЯ ТОЛЬКО УЧИТЬ»</small></h1>
+  </header>
+
+  <!-- Настройка -->
+  <section id="setup">
+    <div class="panel">
+      <h2 class="serif">Новая игра</h2>
+      <p>Сколько команд играет? Названия можно изменить. Правила классические: верный ответ — плюс номинал, неверный после сигнала — минус; «кот в мешке» передаётся другой команде; на «аукционе» отвечает поставившая больше всех; в финале команды делают ставки втайне.</p>
+      <div class="count" id="countBtns" role="group" aria-label="Число команд"></div>
+      <div id="teamInputs"></div>
+      <div><button class="btn gold" id="startBtn">Начать игру</button></div>
+    </div>
+  </section>
+
+  <!-- Табло -->
+  <section id="boardview">
+    <div class="board" id="board" aria-label="Игровое табло"></div>
+    <div class="boardfoot">
+      <span class="hint" id="boardHint">Клик по номиналу открывает вопрос. Сыгранные клетки гаснут.</span>
+      <span style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn gold" id="finalBtn">Финал</button>
+        <button class="btn ghost" id="resetBtn">Новая игра</button>
+      </span>
+    </div>
+    <div class="confirmbar" id="resetConfirm">
+      <span>Сбросить счёт и табло?</span>
+      <button class="btn" id="resetYes">Да, сбросить</button>
+      <button class="btn ghost" id="resetNo">Отмена</button>
+    </div>
+    <div class="scores" id="scores"></div>
+  </section>
+</div>
+
+<!-- Вопрос -->
+<div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="qWhere">
+  <div class="modal">
+    <div class="meta">
+      <span class="where" id="qWhere"></span>
+      <span class="badge" id="qBadge" hidden></span>
+    </div>
+    <div class="qtext serif" id="qText"></div>
+    <div class="answer" id="qAnswer">
+      <div class="a" id="qA"></div>
+      <div class="note" id="qNote"></div>
+    </div>
+    <div class="verdict" id="verdict">
+      <div class="hint">Отметьте результат — очки начислятся автоматически. Для «кота в мешке» отмечайте команду, которой передали вопрос.</div>
+      <div id="verdictRows"></div>
+      <div class="row"><button class="btn ghost" id="nobodyBtn">Никто не ответил — закрыть вопрос</button></div>
+    </div>
+    <div class="foot">
+      <button class="btn ghost" id="backBtn">← Вернуть на табло</button>
+      <button class="btn gold" id="revealBtn">Показать ответ</button>
+      <button class="btn" id="doneBtn" hidden>Готово — к табло</button>
+    </div>
+  </div>
+</div>
+
+<!-- Финал -->
+<div class="overlay" id="finOverlay" role="dialog" aria-modal="true" aria-labelledby="finTitle">
+  <div class="modal">
+    <div class="meta"><span class="where">ФИНАЛЬНЫЙ РАУНД</span><span class="badge">СТАВКИ</span></div>
+    <h2 class="serif" id="finTitle" style="margin:0;text-align:center">Тема: «Исключение из правил»</h2>
+    <div id="finStage1">
+      <p class="hint" style="text-align:center">Каждая команда делает ставку втайне (запишите на бумаге), ведущий вносит её сюда. Ставка — не больше текущего счёта; при счёте ниже 100 команда играет на 100.</p>
+      <div class="betgrid" id="betGrid"></div>
+      <div style="text-align:center;margin-top:12px"><button class="btn gold" id="finShowQ">Показать вопрос</button></div>
+    </div>
+    <div id="finStage2" hidden>
+      <div class="qtext serif">Единственный ярлык студенческого словаря, который наука вообще не считает недостатком: это нормальная характеристика темперамента, а не изъян.</div>
+      <div class="answer" id="finAnswer">
+        <div class="a">Интроверт</div>
+        <div class="note">На перемене — за партой с книгой, в большой компании молчит, дружит с одним-двумя. Норма, а не проблема. Иногда ярлык неправ целиком.</div>
+      </div>
+      <div class="verdict show">
+        <div class="hint" id="finHint">Соберите письменные ответы, затем покажите ответ и отметьте, кто угадал.</div>
+        <div id="finRows" hidden></div>
+      </div>
+      <div class="foot">
+        <span></span>
+        <button class="btn gold" id="finReveal">Показать ответ</button>
+        <button class="btn" id="finDone" hidden>Итоги</button>
+      </div>
+    </div>
+    <div id="finStage3" hidden style="text-align:center;display:flex;flex-direction:column;gap:12px">
+      <h2 class="serif" style="margin:0" id="winnerLine"></h2>
+      <div class="hint">Финальная мысль игры: работать стоит с поведением и потребностью — а не со словом, каким бы оно ни было.</div>
+      <div><button class="btn" id="finClose">Закрыть</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ===== Данные раунда 1 ===== */
+const GAME=[
+ ["Классика жанра",[
+  ["Не начинает работу без напоминаний, бросает начатое, выбирает самое короткое задание. А в тетради мастер-класса про этот ярлык сказано: к нему «нечего применить».","Лентяй","За отказом начинать почти всегда стоит опыт неудачи: безопаснее не начать, чем снова не справиться.",null],
+  ["Тянет руку на каждый вопрос, выкрикивает ответ с места и заметно переживает, если выбрали другого.","Выскочка","Главное для окружающих — не сами ответы, а постоянное «я, я, я». Часто за этим — дефицит значимости.",null],
+  ["Учит всё подряд и дословно, отвечает близко к тексту учебника и паникует от просьбы «а теперь своими словами».","Зубрилка","Ярлык наказывает ребёнка за старательность — и потому особенно несправедлив.",null],
+  ["Этим словом наказывают за темп, который человек не выбирает, — хотя отвечающий с паузой нередко понимает глубже всех.","Тормоз","Темп — характеристика нейродинамики; с глубиной понимания он не связан.",null],
+  ["В глаза хвалит работу одногруппника, за глаза высмеивает её в чате; дружит с тем, кто полезен, — пока полезен.","Лицемер","Один из немногих ярлыков, за которым стоит действительно наблюдаемая пара несовпадающих действий.",null]]],
+ ["Сленговарь",[
+  ["Он «душит» атмосферу: поправляет мелкие ошибки, требует соблюдения правил, когда все договорились их не замечать, и продолжает спор, когда всем уже скучно.","Душнила","Самый частотный ярлык студенческого словаря. Душнилой часто объявляют и того, кто просто оказался прав не вовремя.",null],
+  ["«Выбери меня»: добивается внимания и одобрения, принижая себя или «своих», — «я не такая, как все девочки».","Пикми","За показной скромностью — громкая заявка на исключительность.",null],
+  ["От английского «non-player character»: ярлык, отказывающий человеку в собственном мнении — и вообще в субъектности.","НПС (NPC)","Самый обесчеловечивающий ярлык словаря: он отказывает человеку не в каком-то качестве, а в субъектности вообще.","КОТ В МЕШКЕ"],
+  ["Изображает жизнь, которой не живёт: «отыгрывает» богатство, связи, субкультурность или суровый опыт — пока несоответствие не вскроется.","Ларпер (ларп)","От live action role play — ролевая игра живого действия.",null],
+  ["Слово из уличной иерархии, вернувшееся в оборот после известного сериала: «не пацан», которого «можно» задирать и обирать.","Чушпан","Появление этого слова в классе означает, что в детской среде воспроизводится логика криминальной иерархии. Зона немедленного внимания педагога.",null]]],
+ ["Так говорят в учительской",[
+  ["Дальние парты, куда отсаживают тех, от кого устали, — а потом само место начинает объяснять поведение сидящих.","Камчатка (галёрка, задняя парта)","Редкий случай, когда ярлыком становится не слово, а рассадка. Среда может поддерживать — и может клеймить.",null],
+  ["На любое требование — вздохи, сползание по парте и путь к доске как на казнь.","«Умирающий лебедь»","Ярлык не различает реальную астению, тревожное избегание и выученную тактику «пожалеют — отстанут». А различение — и есть задача педагога.",null],
+  ["Ярлык-пророчество: выдаётся не за поведение, а за отметки — и назначает ребёнку готовое будущее.","«Будущий дворник»","Работает как самосбывающееся пророчество: ребёнок, которому назначили будущее, перестаёт вкладываться в настоящее.",null],
+  ["Этот ярлык учителя произносят почти с одобрением — «с ним нет хлопот». А в тетради мастер-класса это маска, носитель которой дольше всех остаётся незамеченным.","Тихоня (маска «невидимки»)","Не просит, не мешает, не проявляется — способ не попасть под удар. Персональный контакт нужен ему раньше других.",null],
+  ["Единственная статья словаря, в которой описано поведение не ребёнка, а взрослого: слово-маркер педагогического срыва.","«Козлы»","Грубое собирательное без поведенческого содержания. Его появление в речи — сигнал о выгорании взрослого, а не о качествах детей.",null]]],
+ ["Ярлык без поведения",[
+  ["«Крашем» человек становится, не совершив ни одного поступка. За что же тогда?","За внешность и чужие чувства","Это не характеристика поведения, а роль в чужих переживаниях: ярлык достаётся без всякого собственного действия.",null],
+  ["Объясните, почему от дразнилки вроде «босс кфс» невозможно избавиться, изменив поведение.","За ней нет поведения","Прозвище рождается из случайности и держится на повторении: группа смеётся не над смыслом, а над узнаванием. Исправлять нечего.",null],
+  ["Числовой код из студенческого словаря, который требует не словарной статьи, а немедленной реакции взрослого и подключения администрации.","«1488»","Экстремистская (неонацистская) символика — независимо от того, понимает ли подросток значение кода.",null],
+  ["«Чмошник», «терпила», «шестёрка» — эти три слова описывают не поступки человека, а вот это.","Место в иерархии группы","Статусные метки. Их бытование в классе — маркер действующей иерархии силы и вероятного буллинга.","АУКЦИОН"],
+  ["Мем перестаёт быть мемом ровно в этот момент. В какой?","Когда он закреплён за конкретным ребёнком против его воли","Безобидность формулы ничего не говорит о безобидности травли: повторение самой невинной фразы работает как исключение из группы.",null]]],
+ ["Переводим обратно",[
+  ["«Опять весь урок бездельничал» — факт или оценка? Если оценка — переведите в факт.","Оценка","Факт: «за сорок минут написал две строки, трижды вставал, к доске не вышел». Оценка закрывает наблюдение, факт открывает вопросы.",null],
+  ["Почему рабочая тетрадь относит похвалу «Молодец, умница!» к неработающим фразам?","Это ярлык","Его легко обесценить («она всем так говорит»). Рабочая замена — описание факта: «ты начал сразу, как я положила карточку».",null],
+  ["Назовите три критерия проверки фразы педагога из задания «Перевод формулировок».","Короткий горизонт · без сравнения · без ярлыка","Короткий горизонт (результат виден сегодня), нет сравнения с другими, нет ярлыка на личность.",null],
+  ["Чужое поведение мы объясняем характером («ленивый»), своё — обстоятельствами («устал»). Как называется эта ловушка?","Фундаментальная ошибка атрибуции","Именно поэтому «факт вместо оценки» — не вопрос доброй воли, а навык, который требует тренировки.",null],
+  ["Три вопроса, которыми педагог разворачивает любой ярлык обратно в материал для работы.","Поведение? Функция? Дефицит?","Какое наблюдаемое поведение за ним стоит? В каких ситуациях и что следует за ним (функция)? Какой дефицит или маска могут стоять за этим?",null]]]
+];
+const NOM=v=>(v+1)*100;
+
+/* ===== Состояние ===== */
+let S={screen:'setup',n:2,names:['Команда 1','Команда 2','Команда 3','Команда 4'],scores:[0,0,0,0],
+       played:[],cur:null,revealed:false,awarded:[],fin:{stage:0,bets:[],done:[]}};
+
+function save(){try{localStorage.setItem('yarlyki-game-1',JSON.stringify(S));}catch(e){}}
+function load(){try{const r=localStorage.getItem('yarlyki-game-1');if(r){const o=JSON.parse(r);if(o&&o.names)S=Object.assign(S,o);}}catch(e){}}
+
+const $=id=>document.getElementById(id);
+const teams=()=>S.names.slice(0,S.n);
+
+/* ===== Настройка ===== */
+function renderSetup(){
+  const cb=$('countBtns');cb.innerHTML='';
+  [2,3,4].forEach(n=>{const b=document.createElement('button');b.textContent=n;b.setAttribute('aria-pressed',String(S.n===n));
+    b.onclick=()=>{S.n=n;renderSetup();};cb.appendChild(b);});
+  const ti=$('teamInputs');ti.innerHTML='';
+  for(let i=0;i<S.n;i++){const row=document.createElement('div');row.className='teamrow';
+    const inp=document.createElement('input');inp.id='teamname'+i;inp.value=S.names[i];inp.maxLength=30;
+    inp.oninput=()=>{S.names[i]=inp.value||('Команда '+(i+1));};
+    row.appendChild(inp);ti.appendChild(row);}
+}
+$('startBtn').onclick=()=>{S.screen='board';S.scores=[0,0,0,0];S.played=[];S.fin={stage:0,bets:[],done:[]};save();show();};
+
+/* ===== Табло и счёт ===== */
+function renderBoard(){
+  const b=$('board');b.innerHTML='';
+  GAME.forEach((th,t)=>{
+    const h=document.createElement('div');h.className='theme';h.textContent=th[0];b.appendChild(h);
+    for(let v=0;v<5;v++){
+      const idx=t*5+v;const c=document.createElement('button');c.className='cell';
+      const done=S.played.includes(idx);
+      c.textContent=done?'·':NOM(v);c.disabled=done;
+      c.setAttribute('aria-label',th[0]+', '+NOM(v)+(done?', сыграно':''));
+      c.onclick=()=>openQ(t,v);b.appendChild(c);
+    }});
+}
+function renderScores(){
+  const sc=$('scores');sc.innerHTML='';
+  const max=Math.max(...S.scores.slice(0,S.n));
+  teams().forEach((nm,i)=>{
+    const d=document.createElement('div');d.className='team'+(S.scores[i]===max&&max!==0?' lead':'');
+    const n=document.createElement('div');n.className='name';n.textContent=nm;
+    const p=document.createElement('div');p.className='pts'+(S.scores[i]<0?' neg':'');p.textContent=S.scores[i];
+    const adj=document.createElement('div');adj.className='adjust';
+    [[-100,'−100'],[100,'+100']].forEach(([dv,lbl])=>{const ab=document.createElement('button');ab.textContent=lbl;
+      ab.title='Ручная правка счёта';ab.onclick=()=>{S.scores[i]+=dv;save();renderScores();};adj.appendChild(ab);});
+    d.append(n,p,adj);sc.appendChild(d);
+  });
+}
+
+/* ===== Вопрос ===== */
+function openQ(t,v){
+  S.cur=[t,v];S.revealed=false;S.awarded=[];
+  const [q,a,note,sp]=GAME[t][1][v];
+  $('qWhere').textContent=GAME[t][0]+' · '+NOM(v);
+  $('qBadge').hidden=!sp;$('qBadge').textContent=sp||'';
+  $('qText').textContent=q;$('qA').textContent=a;$('qNote').textContent=note;
+  $('qAnswer').classList.remove('show');$('verdict').classList.remove('show');
+  $('revealBtn').hidden=false;$('doneBtn').hidden=true;$('backBtn').hidden=false;
+  $('overlay').classList.add('open');$('revealBtn').focus();
+}
+$('revealBtn').onclick=()=>{
+  S.revealed=true;
+  $('qAnswer').classList.add('show');$('verdict').classList.add('show');
+  $('revealBtn').hidden=true;$('backBtn').hidden=true;$('doneBtn').hidden=false;
+  const vr=$('verdictRows');vr.innerHTML='';
+  const nom=NOM(S.cur[1]);
+  teams().forEach((nm,i)=>{
+    const row=document.createElement('div');row.className='row';
+    const l=document.createElement('span');l.className='lbl';l.textContent=nm;
+    const ok=document.createElement('button');ok.className='vbtn ok';ok.textContent='Верно +'+nom;
+    const no=document.createElement('button');no.className='vbtn no';no.textContent='Неверно −'+nom;
+    ok.onclick=()=>{if(S.awarded.includes(i))return;S.scores[i]+=nom;S.awarded.push(i);ok.classList.add('used');no.classList.add('used');renderScores();save();};
+    no.onclick=()=>{if(S.awarded.includes(i))return;S.scores[i]-=nom;S.awarded.push(i);ok.classList.add('used');no.classList.add('used');renderScores();save();};
+    row.append(l,ok,no);vr.appendChild(row);
+  });
+};
+function burnCurrent(){if(!S.cur)return;const idx=S.cur[0]*5+S.cur[1];if(!S.played.includes(idx))S.played.push(idx);}
+$('doneBtn').onclick=()=>{burnCurrent();S.cur=null;save();$('overlay').classList.remove('open');renderBoard();};
+$('nobodyBtn').onclick=()=>{burnCurrent();S.cur=null;save();$('overlay').classList.remove('open');renderBoard();};
+$('backBtn').onclick=()=>{S.cur=null;$('overlay').classList.remove('open');};
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    if($('overlay').classList.contains('open')&&!S.revealed){$('backBtn').click();}
+  }});
+
+/* ===== Сброс ===== */
+$('resetBtn').onclick=()=>$('resetConfirm').classList.add('show');
+$('resetNo').onclick=()=>$('resetConfirm').classList.remove('show');
+$('resetYes').onclick=()=>{$('resetConfirm').classList.remove('show');S.screen='setup';S.scores=[0,0,0,0];S.played=[];S.fin={stage:0,bets:[],done:[]};save();show();};
+
+/* ===== Финал ===== */
+$('finalBtn').onclick=()=>{
+  S.fin={stage:1,bets:teams().map(()=>100),done:[]};
+  $('finStage1').hidden=false;$('finStage2').hidden=true;$('finStage3').hidden=true;
+  const bg=$('betGrid');bg.innerHTML='';
+  teams().forEach((nm,i)=>{
+    const row=document.createElement('div');row.className='row';
+    const l=document.createElement('span');l.className='lbl';l.style.minWidth='140px';l.style.fontWeight='700';l.textContent=nm;
+    const inp=document.createElement('input');inp.type='number';inp.min='0';inp.step='100';inp.id='bet'+i;
+    const maxBet=Math.max(S.scores[i],100);inp.max=String(maxBet);inp.value=String(Math.min(100,maxBet));
+    inp.oninput=()=>{let x=parseInt(inp.value||'0',10);if(isNaN(x)||x<0)x=0;if(x>maxBet)x=maxBet;S.fin.bets[i]=x;};
+    S.fin.bets[i]=parseInt(inp.value,10);
+    const mx=document.createElement('span');mx.className='max';mx.textContent='макс. '+maxBet;
+    row.append(l,inp,mx);bg.appendChild(row);
+  });
+  $('finOverlay').classList.add('open');
+};
+$('finShowQ').onclick=()=>{$('finStage1').hidden=true;$('finStage2').hidden=false;$('finAnswer').classList.remove('show');$('finRows').hidden=true;$('finReveal').hidden=false;$('finDone').hidden=true;};
+$('finReveal').onclick=()=>{
+  $('finAnswer').classList.add('show');$('finReveal').hidden=true;$('finDone').hidden=false;
+  const fr=$('finRows');fr.hidden=false;fr.innerHTML='';$('finHint').textContent='Отметьте, чей письменный ответ верен: ставка прибавится или спишется.';
+  teams().forEach((nm,i)=>{
+    const row=document.createElement('div');row.className='row';
+    const l=document.createElement('span');l.className='lbl';l.textContent=nm+' (ставка '+S.fin.bets[i]+')';
+    const ok=document.createElement('button');ok.className='vbtn ok';ok.textContent='Верно';
+    const no=document.createElement('button');no.className='vbtn no';no.textContent='Неверно';
+    ok.onclick=()=>{if(S.fin.done.includes(i))return;S.scores[i]+=S.fin.bets[i];S.fin.done.push(i);ok.classList.add('used');no.classList.add('used');renderScores();save();};
+    no.onclick=()=>{if(S.fin.done.includes(i))return;S.scores[i]-=S.fin.bets[i];S.fin.done.push(i);ok.classList.add('used');no.classList.add('used');renderScores();save();};
+    row.append(l,ok,no);fr.appendChild(row);
+  });
+};
+$('finDone').onclick=()=>{
+  $('finStage2').hidden=true;$('finStage3').hidden=false;
+  const max=Math.max(...S.scores.slice(0,S.n));
+  const winners=teams().filter((_,i)=>S.scores[i]===max);
+  $('winnerLine').textContent=winners.length>1?('Ничья: '+winners.join(' и ')+' — '+max):('Победитель — '+winners[0]+': '+max);
+  save();
+};
+$('finClose').onclick=()=>{$('finOverlay').classList.remove('open');};
+
+/* ===== Переключение экранов ===== */
+function show(){
+  $('setup').style.display=S.screen==='setup'?'block':'none';
+  $('boardview').style.display=S.screen==='board'?'flex':'none';
+  if(S.screen==='setup')renderSetup();
+  if(S.screen==='board'){renderBoard();renderScores();}
+}
+function start(data){
+  if(data&&data.S){S=Object.assign(S,data.S);}else{load();}
+  show();
+}
+if(window.claude&&window.claude.hot){
+  try{window.claude.hot.snapshot(()=>({S}));}catch(e){}
+  window.claude.hot.ready?window.claude.hot.ready(start):start(window.claude.hot.data||null);
+}else{start(null);}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Своя игра: Ярлыки</title>
+<style>
+:root{
+  --bg:#F4EDE4; --card:#FFFFFF; --ink:#2B1B22; --berry:#6D2E46; --rose:#A26769; --gold:#C9A227;
+  --muted:#7A6A70; --line:#E3D6C8;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#201318; --card:#2E1E26; --ink:#F2E7EA; --berry:#D98BA6; --rose:#C49496; --gold:#D9B65A; --muted:#B39AA4; --line:#4A3540; }
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:Georgia,'Times New Roman',serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px}
+.wrap{max-width:640px;width:100%}
+h1{font-size:clamp(26px,5vw,38px);color:var(--berry);letter-spacing:.04em;text-align:center}
+.sub{text-align:center;color:var(--muted);margin:10px 0 28px;font-size:15px;line-height:1.5}
+.cards{display:grid;gap:16px}
+a.card{display:block;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 24px;text-decoration:none;color:var(--ink);transition:transform .12s ease, box-shadow .12s ease}
+a.card:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.12)}
+.tag{display:inline-block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--card);background:var(--berry);border-radius:999px;padding:4px 12px;margin-bottom:10px;font-family:Arial,sans-serif}
+.tag.hard{background:var(--gold);color:#2B1B22}
+a.card h2{font-size:21px;margin-bottom:6px;color:var(--berry)}
+a.card p{color:var(--muted);font-size:14.5px;line-height:1.55}
+.note{margin-top:26px;text-align:center;color:var(--muted);font-size:13px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>СВОЯ ИГРА: ЯРЛЫКИ</h1>
+  <p class="sub">Интеллектуальная игра по словарю терминов-образов — ярлыков, которыми характеризуют детей в школе. Для педагогов, студентов и родителей. Играть можно командой с одного экрана.</p>
+  <div class="cards">
+    <a class="card" href="round1.html">
+      <span class="tag">Раунд 1</span>
+      <h2>Основная игра</h2>
+      <p>Пять тем, вопросы от 100 до 500. «Кот в мешке», аукцион и финал со ставками. Подходит для первого знакомства со словарём.</p>
+    </a>
+    <a class="card" href="round2.html">
+      <span class="tag hard">Раунд 2 · сложнее</span>
+      <h2>Для знатоков</h2>
+      <p>Вопросы от 200 до 1000: маски и дефициты, «почувствуйте разницу», происхождение слов, механика ярлыка и красная зона.</p>
+    </a>
+    <a class="card" href="solo.html">
+      <span class="tag" style="background:var(--ink,#2B1B22);color:#fff">Онлайн · без ведущего</span>
+      <h2>Личный зачёт онлайн</h2>
+      <p>Каждый играет сам на своём телефоне: 125 вопросов с вариантами ответов, таймер, ставка в финале и код результата для честного сравнения. Хоть 24 человека одновременно — просто раздайте ссылку.</p>
+    </a>
+    <a class="card" href="turnir.html">
+      <span class="tag" style="background:var(--rose)">Турнир · до 24 участников</span>
+      <h2>Личный зачёт</h2>
+      <p>Каждый играет сам за себя: 5 раундов нарастающей сложности, 125 новых вопросов, финал со ставками. Рассчитан на 3–3,5 часа — для студенческой группы или педсовета.</p>
+    </a>
+  </div>
+  <p class="note">Игры работают прямо в браузере, без установки и регистрации.<br>Счёт команд сохраняется на устройстве до конца партии.</p>
+</div>
+</body>
+</html>
